@@ -6,8 +6,8 @@ spring:
   mail:
     host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
     port: ${MAIL_PORT:2525}
-    username: ${MAIL_USERNAME:7c1cb5a7dd6075}
-    password: ${MAIL_PASSWORD:7e1dfbb1498d56}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     protocol: smtp
     properties:
       mail:
