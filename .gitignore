@@ -77,3 +77,4 @@ inventory-service/docker/mysql/
 
 # OS
 .DS_Store
+README.md
