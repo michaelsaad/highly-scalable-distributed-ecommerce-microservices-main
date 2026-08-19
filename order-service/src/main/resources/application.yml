@@ -1,0 +1,143 @@
+spring:
+  application:
+    name: order-service
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/order_service?createDatabaseIfNotExist=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:mysql}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: order-service-pool
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    template:
+      default-topic: order-placed
+      observation-enabled: true
+    producer:
+      client-id: ${spring.application.name}
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8085}
+
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain
+    min-response-size: 1024
+  error:
+    include-message: never
+    include-stacktrace: never
+
+inventory:
+  url: ${INVENTORY_URL:http://localhost:8082}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /api-docs
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      inventory:
+        register-health-indicator: true
+        event-consumer-buffer-size: 10
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        minimum-number-of-calls: 5
+  timelimiter:
+    instances:
+      inventory:
+        timeout-duration: 3s
+  retry:
+    instances:
+      inventory:
+        max-attempts: 3
+        wait-duration: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,circuitbreakers
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    circuitbreakers:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  info:
+    env:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  observations:
+    key-values:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+    propagation:
+      type: w3c
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: Order microservice
+
+loki:
+  url: ${LOKI_URL:http://localhost:3100/loki/api/v1/push}
+
+logging:
+  level:
+    root: INFO
+    com.m1kllz.ecommerce: DEBUG
+    org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
