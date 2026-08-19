@@ -1,0 +1,78 @@
+# Build outputs
+**/target/
+**/build/
+**/bin/
+
+# IDE / Editor files
+.vscode/
+.idea/
+.metadata/
+*.iml
+
+# OS / System files
+.DS_Store
+Thumbs.db
+
+# Environment & secrets 
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.crt
+**/secrets/
+
+# Local databases & runtime data
+**/data/
+**/db-data/
+**/mongo-data/
+**/mysql-data/
+**/postgres-data/
+**/volume-data/
+
+# Service-specific local volumes 
+product-service/data/mongodb/
+order-service/docker/mysql/
+inventory-service/docker/mysql/
+
+# Docker runtime & secrets
+**/docker/volume-data/
+**/docker/secrets/
+**/docker/tmp/
+
+# Logs
+**/logs/
+**/*.log
+
+# Test & coverage reports
+**/coverage/
+**/jacoco/
+**/*.exec
+
+
+# Temporary files
+**/tmp/
+**/*.tmp
+**/*.swp
+
+# ignore all .gitignore and .gitattributes files in subfolders
+**/.gitignore
+**/.gitattributes
+!.gitignore
+
+# Maven
+**/target/
+
+# IDE (Eclipse / STS / IntelliJ / VSCode)
+**/.classpath
+**/.project
+**/.settings/
+**/.factorypath
+**/HELP.md
+.idea/
+.vscode/
+
+# Logs
+**/*.log
+
+# OS
+.DS_Store
