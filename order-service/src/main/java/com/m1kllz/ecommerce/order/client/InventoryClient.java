@@ -2,8 +2,6 @@ package com.m1kllz.ecommerce.order.client;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-
 import com.m1kllz.ecommerce.order.exception.InventoryUnavailableException;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -42,8 +40,45 @@ public class InventoryClient {
                 }
         }
 
+        @CircuitBreaker(name = "inventory", fallbackMethod = "inventoryFallback")
+        @Retry(name = "inventory")
+        public boolean decrementStock(String skuCode, int quantity) {
+                log.info("Decrementing inventory for skuCode: {} quantity: {}", skuCode, quantity);
+                Boolean result = webClient.post()
+                                .uri(uriBuilder -> uriBuilder
+                                                .path("/api/inventory/decrement")
+                                                .queryParam("skuCode", skuCode)
+                                                .queryParam("quantity", quantity)
+                                                .build())
+                                .retrieve()
+                                .bodyToMono(Boolean.class)
+                                .block();
+                return Boolean.TRUE.equals(result);
+        }
+
+        @CircuitBreaker(name = "inventory", fallbackMethod = "inventoryVoidFallback")
+        @Retry(name = "inventory")
+        public void restoreStock(String skuCode, int quantity) {
+                log.info("Restoring inventory for skuCode: {} quantity: {}", skuCode, quantity);
+                webClient.post()
+                                .uri(uriBuilder -> uriBuilder
+                                                .path("/api/inventory/restore")
+                                                .queryParam("skuCode", skuCode)
+                                                .queryParam("quantity", quantity)
+                                                .build())
+                                .retrieve()
+                                .toBodilessEntity()
+                                .block();
+        }
+
         public boolean inventoryFallback(String skuCode, int quantity, Throwable ex) {
                 log.error("Inventory service fallback executed. Root cause: {}",
+                                ex != null ? ex.getMessage() : "Unknown");
+                throw new InventoryUnavailableException("Inventory service unavailable. Please try later.");
+        }
+
+        public void inventoryVoidFallback(String skuCode, int quantity, Throwable ex) {
+                log.error("Inventory service fallback (void) executed. Root cause: {}",
                                 ex != null ? ex.getMessage() : "Unknown");
                 throw new InventoryUnavailableException("Inventory service unavailable. Please try later.");
         }

@@ -24,4 +24,21 @@ public class InventoryServiceImpl implements InventoryService {
         log.debug("Stock check skuCode={} quantity={} inStock={}", skuCode, quantity, inStock);
         return inStock;
     }
+
+    @Override
+    @Transactional
+    @Observed(name = "inventory.decrement")
+    public boolean decrementStock(String skuCode, Integer quantity) {
+        int updated = inventoryRepository.decrementQuantity(skuCode, quantity);
+        log.info("Decrement stock skuCode={} quantity={} success={}", skuCode, quantity, updated > 0);
+        return updated > 0;
+    }
+
+    @Override
+    @Transactional
+    @Observed(name = "inventory.restore")
+    public void restoreStock(String skuCode, Integer quantity) {
+        inventoryRepository.restoreQuantity(skuCode, quantity);
+        log.info("Restored stock skuCode={} quantity={}", skuCode, quantity);
+    }
 }

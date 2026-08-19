@@ -21,6 +21,7 @@ import io.micrometer.observation.annotation.Observed;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +41,12 @@ public class OrderServiceImpl implements OrderService {
             throw new ProductOutOfStockException(
                     "Product with SKU Code " + orderRequest.skuCode() + " and quantity " + orderRequest.quantity()
                             + " is not available in inventory.");
+        }
+
+        boolean decremented = inventoryClient.decrementStock(orderRequest.skuCode(), orderRequest.quantity());
+        if (!decremented) {
+            throw new ProductOutOfStockException(
+                    "Failed to reserve inventory for SKU " + orderRequest.skuCode() + " quantity " + orderRequest.quantity());
         }
 
         var order = mapToOrder(orderRequest);
@@ -67,11 +74,12 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void cancelOrder(String orderNumber) {
-        if (!orderRepository.existsByOrderNumber(orderNumber)) {
-            throw new OrderNotFoundException(orderNumber);
-        }
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new OrderNotFoundException(orderNumber));
         orderRepository.deleteByOrderNumber(orderNumber);
-        log.info("Order cancelled orderNumber={}", orderNumber);
+        inventoryClient.restoreStock(order.getSkuCode(), order.getQuantity());
+        log.info("Order cancelled orderNumber={}, restored stock skuCode={} quantity={}",
+                orderNumber, order.getSkuCode(), order.getQuantity());
     }
 
     private void publishOrderPlaced(Order order, OrderRequest orderRequest) {
@@ -81,18 +89,22 @@ public class OrderServiceImpl implements OrderService {
             event.setEmail(orderRequest.userDetails().email());
             event.setFirstName(orderRequest.userDetails().firstName());
             event.setLastName(orderRequest.userDetails().lastName());
+        } else {
+            event.setEmail("");
+            event.setFirstName("");
+            event.setLastName("");
         }
 
         String topic = "order-placed";
-        kafkaTemplate.send(topic, order.getOrderNumber(), event)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info("Published OrderPlacedEvent topic={} orderNumber={}", topic, order.getOrderNumber());
-                    } else {
-                        log.error("Failed to publish OrderPlacedEvent topic={} orderNumber={}",
-                                topic, order.getOrderNumber(), ex);
-                    }
-                });
+        try {
+            kafkaTemplate.send(topic, order.getOrderNumber(), event).get();
+            log.info("Published OrderPlacedEvent topic={} orderNumber={}", topic, order.getOrderNumber());
+        } catch (ExecutionException e) {
+            throw new RuntimeException("Failed to publish OrderPlacedEvent for order " + order.getOrderNumber(), e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while publishing OrderPlacedEvent for order " + order.getOrderNumber(), e);
+        }
     }
 
     private OrderResponse mapToOrderResponse(Order order) {
@@ -100,6 +112,8 @@ public class OrderServiceImpl implements OrderService {
                 order.getQuantity());
     }
 
+    // TODO: Price is taken from the client request and not verified against the product catalog.
+    //  Add a product-service client to look up the authoritative price by SKU before persisting.
     private static Order mapToOrder(OrderRequest orderRequest) {
         Order order = new Order();
         order.setOrderNumber(UUID.randomUUID().toString());
