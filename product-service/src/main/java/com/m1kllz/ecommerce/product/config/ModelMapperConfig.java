@@ -1,0 +1,13 @@
+package com.m1kllz.ecommerce.product.config;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class ModelMapperConfig {
+    @Bean
+    public ModelMapper modelMapper() {
+        return new ModelMapper();
+    }
+}
