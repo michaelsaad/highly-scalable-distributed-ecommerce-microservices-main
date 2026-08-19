@@ -1,0 +1,186 @@
+server:
+  port: ${SERVER_PORT:9000}
+  shutdown: graceful
+  forward-headers-strategy: native
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  application:
+    name: api-gateway
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  main:
+    web-application-type: reactive
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8181/realms/ecommerce-realm}
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 5s
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins:
+              - "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+      routes:
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: productServiceCircuit
+                fallbackUri: forward:/fallback/products
+            - name: Retry
+              args:
+                retries: 3
+                statuses: BAD_GATEWAY,GATEWAY_TIMEOUT
+                methods: GET
+
+        - id: product-service-swagger
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8080}
+          predicates:
+            - Path=/aggregate/product-service/api-docs
+          filters:
+            - SetPath=/api-docs
+            - AddResponseHeader=Content-Type, application/json
+
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: orderServiceCircuit
+                fallbackUri: forward:/fallback/orders
+
+        - id: order-service-swagger
+          uri: ${ORDER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/aggregate/order-service/api-docs
+          filters:
+            - SetPath=/api-docs
+            - AddResponseHeader=Content-Type, application/json
+
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/inventory/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: inventoryServiceCircuit
+                fallbackUri: forward:/fallback/inventory
+
+        - id: inventory-service-swagger
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/aggregate/inventory-service/api-docs
+          filters:
+            - SetPath=/api-docs
+            - AddResponseHeader=Content-Type, application/json
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 2s
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui/index.html
+    urls:
+      - name: Product Service
+        url: /aggregate/product-service/api-docs
+      - name: Order Service
+        url: /aggregate/order-service/api-docs
+      - name: Inventory Service
+        url: /aggregate/inventory-service/api-docs
+
+management:
+  health:
+    circuitbreakers:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,gateway,circuitbreakers
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  info:
+    env:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  observations:
+    key-values:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+    propagation:
+      type: w3c
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: API Gateway
+
+loki:
+  url: ${LOKI_URL:http://localhost:3100/loki/api/v1/push}
+
+logging:
+  level:
+    root: INFO
+    com.m1kllz.ecommerce: DEBUG
+    org.springframework.cloud.gateway: INFO
