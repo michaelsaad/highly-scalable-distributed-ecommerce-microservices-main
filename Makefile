@@ -17,6 +17,8 @@ SKIP_TESTS ?= -DskipTests
 	infra-data infra-messaging infra-observability \
 	build test clean \
 	run-product run-order run-inventory run-notification run-gateway \
+	dev dev-up dev-down dev-logs \
+	prod prod-up prod-down prod-logs \
 	health
 
 help:
@@ -44,6 +46,15 @@ help:
 	@echo "  make run-inventory         inventory-service :8082"
 	@echo "  make run-notification      notification-service :9876"
 	@echo "  make run-gateway           api-gateway       :9000"
+	@echo ""
+	@echo "  Docker (full stack)"
+	@echo "  -------------------"
+	@echo "  make dev                   Start everything in dev mode (ports exposed)"
+	@echo "  make dev-down              Stop dev stack"
+	@echo "  make dev-logs              Follow dev stack logs"
+	@echo "  make prod                  Start everything in prod mode (restricted ports)"
+	@echo "  make prod-down             Stop prod stack"
+	@echo "  make prod-logs             Follow prod stack logs"
 	@echo ""
 	@echo "  Ops"
 	@echo "  ---"
@@ -111,6 +122,28 @@ run-notification:
 
 run-gateway:
 	cd api-gateway && $(MVNW) spring-boot:run
+
+# ── Docker full-stack targets ────────────────────────────────
+
+dev: dev-up
+dev-up:
+	$(COMPOSE) --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+dev-down:
+	$(COMPOSE) --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml down
+
+dev-logs:
+	$(COMPOSE) --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=100
+
+prod: prod-up
+prod-up:
+	$(COMPOSE) --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+prod-down:
+	$(COMPOSE) --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml down
+
+prod-logs:
+	$(COMPOSE) --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=100
 
 health:
 	@echo "product     :" && curl -sf http://localhost:8080/actuator/health || echo "down"
