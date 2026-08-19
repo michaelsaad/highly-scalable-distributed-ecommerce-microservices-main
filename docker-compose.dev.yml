@@ -1,0 +1,94 @@
+# Development overrides — exposes all ports for local debugging
+services:
+
+  product-mongodb:
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongodb:/data/db
+
+  order-db:
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/order-mysql:/var/lib/mysql
+      - ./docker/mysql/order-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  inventory-db:
+    ports:
+      - "3308:3306"
+    volumes:
+      - ./data/inventory-mysql:/var/lib/mysql
+      - ./docker/mysql/inventory-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  zookeeper:
+    ports:
+      - "2181:2181"
+
+  broker:
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+
+  schema-registry:
+    ports:
+      - "8085:8081"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8086:8080"
+    depends_on:
+      - broker
+      - schema-registry
+    environment:
+      KAFKA_CLUSTERS_NAME: local
+      KAFKA_CLUSTERS_BOOTSTRAPSERVERS: broker:29092
+      KAFKA_CLUSTERS_SCHEMAREGISTRY: http://schema-registry:8081
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - ecommerce
+
+  keycloak:
+    ports:
+      - "8181:8080"
+
+  loki:
+    ports:
+      - "3100:3100"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  tempo:
+    ports:
+      - "3110:3100"
+      - "9411:9411"
+
+  grafana:
+    ports:
+      - "3000:3000"
+
+  product-service:
+    ports:
+      - "8080:8080"
+
+  order-service:
+    ports:
+      - "8081:8081"
+
+  inventory-service:
+    ports:
+      - "8082:8082"
+    environment:
+      DB_URL: jdbc:mysql://inventory-db:3306/inventory_service
+
+  notification-service:
+    ports:
+      - "9876:9876"
+
+  api-gateway:
+    ports:
+      - "9000:9000"
