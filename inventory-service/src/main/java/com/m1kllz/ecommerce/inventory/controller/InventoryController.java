@@ -25,4 +25,20 @@ public class InventoryController {
             @RequestParam @Min(1) Integer quantity) {
         return inventoryService.isInStock(skuCode, quantity);
     }
+
+    @PostMapping("/decrement")
+    @ResponseStatus(HttpStatus.OK)
+    public boolean decrementStock(
+            @RequestParam @NotBlank String skuCode,
+            @RequestParam @Min(1) Integer quantity) {
+        return inventoryService.decrementStock(skuCode, quantity);
+    }
+
+    @PostMapping("/restore")
+    @ResponseStatus(HttpStatus.OK)
+    public void restoreStock(
+            @RequestParam @NotBlank String skuCode,
+            @RequestParam @Min(1) Integer quantity) {
+        inventoryService.restoreStock(skuCode, quantity);
+    }
 }
